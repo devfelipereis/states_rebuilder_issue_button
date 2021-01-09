@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:states_rebuilder/states_rebuilder.dart';
 
 final _apiUrlRM = RM.inject<String>(
-  () => 'http://googlec.com',
+  () => '',
 );
-final _scoreRM = RM.inject<String>(() => '58');
+final _scoreRM = RM.inject<String>(() => '');
 
 class SettingsScreen extends StatelessWidget {
-  bool get _isFormValid =>
-      _apiUrlRM.hasData &&
-      _scoreRM.hasData; // this will not activate the button
   // bool get _isFormValid =>
-  //     _apiUrlRM.state.isNotEmpty &&
-  //     _scoreRM.state.isNotEmpty; // this will activate the button
+  //     _apiUrlRM.hasData &&
+  //     _scoreRM.hasData; // this will not activate the button
+  bool get _isFormValid =>
+      _apiUrlRM.state.isNotEmpty &&
+      _scoreRM.state.isNotEmpty; // this will activate the button
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +109,7 @@ class SettingsScreen extends StatelessWidget {
             _scoreRM.setState(
               (_) {
                 if (value.isEmpty) {
+                  // the save button will never deactivate because the _scoreRM state will never be empty
                   throw ValidationException('Este campo é obrigatório');
                 }
 
@@ -142,6 +143,7 @@ class SettingsScreen extends StatelessWidget {
             _apiUrlRM.setState(
               (_) {
                 if (value.isEmpty) {
+                  // the save button will never deactivate because the _apiUrlRM state will never be empty
                   throw ValidationException('Este campo é obrigatório');
                 }
                 return value;
