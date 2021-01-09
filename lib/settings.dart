@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:states_rebuilder/states_rebuilder.dart';
 
 final _apiUrlRM = RM.inject<String>(
-  () => '',
+  () => 'http://google.com',
 );
-final _scoreRM = RM.inject<String>(() => '');
+final _scoreRM = RM.inject<String>(() => '50');
 
 class SettingsScreen extends StatelessWidget {
   // bool get _isFormValid =>
