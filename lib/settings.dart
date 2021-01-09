@@ -24,18 +24,18 @@ fetchToSetting() async {
 }
 
 //Global
-final appSettings = RM.injectFuture<AppSettings>(() async => AppSettings()
-    // use this, if you want init settings
-    // await fetchToSetting(),
-    );
+final appSettings = RM.injectFuture<AppSettings>(
+  () async => // AppSettings()
+      // use this, if you want init settings
+      await fetchToSetting(),
+);
 
 //Local
 final _apiUrlRM = RM.inject<String>(() => '');
 final _scoreRM = RM.inject<String>(() => '');
 
 class SettingsScreen extends StatelessWidget {
-  bool get _isFormValid =>
-      appSettings.state.apiUrl != null && appSettings.state.score != null;
+  bool get _isFormValid => !_apiUrlRM.hasError && !_scoreRM.hasError;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +65,12 @@ class SettingsScreen extends StatelessWidget {
                 buildLabel(context, 'Score'),
                 scoreInput(),
                 [_apiUrlRM, _scoreRM].rebuilder(
-                    () => Center(child: Text('FormValid: $_isFormValid'))),
+                  () => Center(child: Text('FormValid: $_isFormValid')),
+                  shouldRebuild: () =>
+                      _apiUrlRM.hasData ||
+                      _scoreRM
+                          .hasData, //By default it will rebuild when both have data, or you can simply use whenRebuilderOr()
+                ),
                 SizedBox(
                   // height: 100.h,
                   height: 100,
