@@ -1,18 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:states_rebuilder/states_rebuilder.dart';
 
-final _apiUrlRM = RM.inject<String>(
-  () => 'http://google.com',
+class AppSettings {
+  final String apiUrl;
+  final String score;
+
+  AppSettings({
+    this.apiUrl,
+    this.score,
+  });
+}
+
+class ValidationException implements Exception {
+  final String message;
+  ValidationException(this.message);
+  @override
+  String toString() => message.toString();
+}
+
+fetchToSetting() async {
+  await Future.delayed(Duration(seconds: 2));
+  return AppSettings(apiUrl: 'http://googlec.com', score: '33');
+}
+
+//Global
+final appSettings = RM.injectFuture<AppSettings>(
+  () async => // AppSettings()
+      // use this, if you want init settings
+      await fetchToSetting(),
 );
-final _scoreRM = RM.inject<String>(() => '50');
+
+//Local
+final _apiUrlRM = RM.inject<String>(() => '');
+final _scoreRM = RM.inject<String>(() => '');
 
 class SettingsScreen extends StatelessWidget {
-  // bool get _isFormValid =>
-  //     _apiUrlRM.hasData &&
-  //     _scoreRM.hasData; // this will not activate the button
-  bool get _isFormValid =>
-      _apiUrlRM.state.isNotEmpty &&
-      _scoreRM.state.isNotEmpty; // this will activate the button
+  bool get _isFormValid => !_apiUrlRM.hasError && !_scoreRM.hasError;
 
   @override
   Widget build(BuildContext context) {
@@ -29,49 +52,82 @@ class SettingsScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              buildLabel(context, 'Dominio'),
-              apiInput(),
-              buildSpace(),
-              buildLabel(context, 'Score'),
-              scoreInput(),
-              SizedBox(
-                height: 50,
-              ),
-              [_apiUrlRM, _scoreRM].rebuilder(() {
-                return Align(
-                  alignment: Alignment.center,
-                  child: MaterialButton(
-                    disabledColor: Colors.blueGrey[100],
-                    onPressed: !_isFormValid
-                        ? null
-                        : () async {
-                            FocusScope.of(context).unfocus();
-                            print(_scoreRM.state);
-                            print(_apiUrlRM.state);
-                          },
-                    child: Text(
-                      'save',
-                      style: TextStyle(
-                        fontSize: 25,
+          child: appSettings.whenRebuilderOr(
+            onWaiting: () => const Center(child: CircularProgressIndicator()),
+            builder: () => Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                buildLabel(context, 'Dominio'),
+                apiInput(),
+                buildSpace(),
+                buildLabel(context, 'Score'),
+                scoreInput(),
+                [_apiUrlRM, _scoreRM].rebuilder(
+                  () => Center(child: Text('FormValid: $_isFormValid')),
+                  shouldRebuild: () =>
+                      _apiUrlRM.hasData ||
+                      _scoreRM
+                          .hasData, //By default it will rebuild when both have data, or you can simply use whenRebuilderOr()
+                ),
+                SizedBox(
+                  // height: 100.h,
+                  height: 100,
+                ),
+                [_apiUrlRM, _scoreRM].whenRebuilderOr(
+                  builder: () {
+                    return Align(
+                      alignment: Alignment.center,
+                      child: MaterialButton(
+                        disabledColor: Colors.blueGrey[100],
+                        onPressed: !_isFormValid
+                            ? null
+                            : () async {
+                                FocusScope.of(context).unfocus();
+
+                                final settings = AppSettings(
+                                  score: _scoreRM.state,
+                                  apiUrl: _apiUrlRM.state,
+                                );
+
+                                appSettings.setState(
+                                  (s) async {
+                                    //For showing Indicator only
+                                    await Future.delayed(Duration(seconds: 2));
+
+                                    return settings;
+                                  },
+                                  onData: (context, model) {
+                                    // successToast('Configurações atualizadas.');
+                                    print('Configurações atualizadas.');
+                                  },
+                                  onError: (context, error) => print(
+                                      'Não foi possível fazer o registro.'),
+                                  shouldAwait: true,
+                                );
+                              },
+                        child: Text(
+                          'salvar',
+                          style: TextStyle(
+                            fontSize: 25,
+                          ),
+                        ),
+                        color: Theme.of(context).primaryColor,
+                        elevation: 0,
+                        // height: 150.h,
+                        // minWidth: 0.7.sw,
+                        height: 150,
+                        textColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
                       ),
-                    ),
-                    color: Theme.of(context).primaryColor,
-                    elevation: 0,
-                    height: 50,
-                    minWidth: 400,
-                    textColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                );
-              })
-            ],
+                    );
+                  },
+                )
+              ],
+            ),
           ),
         ),
       ),
@@ -80,6 +136,7 @@ class SettingsScreen extends StatelessWidget {
 
   SizedBox buildSpace() {
     return SizedBox(
+      // height: 25.h,
       height: 25,
     );
   }
@@ -95,47 +152,14 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  StateBuilder<String> scoreInput() {
-    return _scoreRM.whenRebuilderOr(
-      builder: () {
-        return TextFormField(
-          initialValue: _scoreRM.state,
-          decoration: InputDecoration(
-            errorText: _scoreRM.error == null ? null : _scoreRM.error.message,
-          ),
-          keyboardType: TextInputType.number,
-          autocorrect: false,
-          onChanged: (value) {
-            _scoreRM.setState(
-              (_) {
-                if (value.isEmpty) {
-                  // the save button will never deactivate because the _scoreRM state will never be empty
-                  throw ValidationException('Este campo é obrigatório');
-                }
-
-                if (int.tryParse(value) == null) {
-                  throw ValidationException(
-                    'O Score precisa ser um número',
-                  );
-                }
-
-                return value;
-              },
-              catchError: true,
-            );
-          },
-        );
-      },
-    );
-  }
-
-  StateBuilder<String> apiInput() {
+  Widget apiInput() {
     return _apiUrlRM.whenRebuilderOr(
+      initState: () => _apiUrlRM.setState((s) => appSettings.state.apiUrl),
       builder: () {
         return TextFormField(
           initialValue: _apiUrlRM.state,
           decoration: InputDecoration(
-            errorText: _apiUrlRM.error == null ? null : _apiUrlRM.error.message,
+            errorText: _apiUrlRM.hasError ? _apiUrlRM.error.message : null,
           ),
           keyboardType: TextInputType.text,
           autocorrect: false,
@@ -143,7 +167,6 @@ class SettingsScreen extends StatelessWidget {
             _apiUrlRM.setState(
               (_) {
                 if (value.isEmpty) {
-                  // the save button will never deactivate because the _apiUrlRM state will never be empty
                   throw ValidationException('Este campo é obrigatório');
                 }
                 return value;
@@ -155,10 +178,36 @@ class SettingsScreen extends StatelessWidget {
       },
     );
   }
-}
 
-class ValidationException implements Exception {
-  final String message;
+  Widget scoreInput() {
+    return _scoreRM.whenRebuilderOr(
+      initState: () => _scoreRM.setState((s) => appSettings.state.score),
+      builder: () {
+        return TextFormField(
+          initialValue: _scoreRM.state,
+          decoration: InputDecoration(
+            errorText: _scoreRM.hasError ? _scoreRM.error.message : null,
+          ),
+          keyboardType: TextInputType.number,
+          autocorrect: false,
+          onChanged: (value) {
+            _scoreRM.setState(
+              (_) {
+                if (value.isEmpty) {
+                  throw ValidationException('Este campo é obrigatório');
+                }
 
-  ValidationException(this.message);
+                if (int.tryParse(value) == null) {
+                  throw ValidationException('O Score precisa ser um número');
+                }
+
+                return value;
+              },
+              catchError: true,
+            );
+          },
+        );
+      },
+    );
+  }
 }
